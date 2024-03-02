@@ -73,6 +73,9 @@ func (s *ClientSession) Open() (io.ReadWriteCloser, error) {
 }
 
 func (s *ClientSession) OpenStream() (*ClientStream, error) {
+	if s.cc.State().Closed {
+		return nil, fmt.Errorf("connection closed")
+	}
 	cs, err := newClientStream(s)
 	if err != nil {
 		return nil, err
@@ -115,6 +118,7 @@ func newClientStream(s *ClientSession) (*ClientStream, error) {
 		}
 		cs.markBodyReady(resp.Body, nil)
 	}()
+	//TODO: 链接失败，应该在new client之前感知
 	return cs, nil
 }
 
