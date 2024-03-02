@@ -120,11 +120,6 @@ func newServerStream(s *ServerSession, id uint32, w http.ResponseWriter, r *http
 }
 
 func (s *ServerStream) Read(b []byte) (int, error) {
-	s.lck.Lock()
-	defer s.lck.Unlock()
-	if s.isClosed {
-		return 0, fmt.Errorf("read on closed stream")
-	}
 	return s.r.Body.Read(b)
 }
 
