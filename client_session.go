@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/net/http2"
 )
@@ -97,7 +98,7 @@ func (s *ClientSession) Close() error {
 
 func newClientStream(s *ClientSession) (*ClientStream, error) {
 	pr, pw := io.Pipe()
-	req, err := http.NewRequest(http.MethodPut, "http://127.1", pr)
+	req, err := http.NewRequest(http.MethodPut, "http://127.1", io.NopCloser(pr))
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +119,6 @@ func newClientStream(s *ClientSession) (*ClientStream, error) {
 		}
 		cs.markBodyReady(resp.Body, nil)
 	}()
-	//TODO: 链接失败，应该在new client之前感知
 	return cs, nil
 }
 
@@ -161,6 +161,13 @@ func (c *ClientStream) Close() error {
 		if c.writeCloser != nil {
 			werr = c.writeCloser.Close()
 		}
+		//关闭rsp.Body会设置abortErr, 这个错误在req.Body读取并写入到远端后会进行判断, 如果存在这个错误, 则会触发一个stream cancel的错误
+		//这个req.Body读取逻辑在roundTrip里面, 是个异步流程, 所以如果关闭req.Body后, 快速关闭rsp.Body 就可能会导致写入abortErr的这个操作先被执行而导致
+		//最终触发stream cancel错误.
+		//这个错误貌似没什么影响？
+		//
+		//补充延迟, 减少触发的几率
+		time.Sleep(10 * time.Millisecond)
 		if c.readCloser != nil {
 			rerr = c.readCloser.Close()
 		}
